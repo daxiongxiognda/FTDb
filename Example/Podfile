@@ -1,0 +1,6 @@
+use_frameworks!
+target 'FTDb_Tests' do
+  pod 'FTDb', :path => '../'
+  
+  
+end
