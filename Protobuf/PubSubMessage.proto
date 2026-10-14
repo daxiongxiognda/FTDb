@@ -1,0 +1,136 @@
+syntax = "proto3";
+
+package app.meeky;
+
+// Java 生成配置：指定包名和外部类名
+option java_package = "com.atlas.im.model.protobuf";
+option java_outer_classname = "PubSubProtocol";
+// Swift 生成配置：生成的类型会带 "IM" 前缀，避免命名冲突
+option swift_prefix = "IM";
+
+
+// MARK: - 顶层消息
+
+/// 发布/订阅通道的统一消息封装。
+///
+/// 这是 socket 上传输的**最外层信封**：真正的业务数据放在 `content` 里，
+/// 通过 `type` 区分这条消息的用途。
+message PubSubMessage {
+
+    /// 消息类型。
+    enum Type {
+        /// 未知类型（占位，解析到不支持的值时返回）。
+        UNKNOWN = 0;
+        /// 投递消息（服务器推送的业务数据）。
+        DELIVER = 1;
+        /// 心跳保活。
+        KEEPALIVE = 2;
+        /// 连接关闭。
+        CLOSED = 3;
+        /// 连接状态变化。
+        CONNECT_CHANGED = 4;
+        /// 服务器内部消息。
+        INTERNAL = 5; // 服务器内部消息
+    }
+
+    /// 消息类型，决定 `content` 如何解析。
+    Type type = 1;
+
+    /// 消息内容（二进制）。根据 `type` 解析为对应的子消息。
+    bytes content = 2;
+}
+
+
+/// 服务器内部消息封装。
+///
+/// 当 `PubSubMessage.type == INTERNAL` 时，`content` 按此结构解析。
+message InternalMessage {
+
+    /// 内部消息类型。
+    enum Type {
+        /// 未知类型（占位）。
+        UNKNOWN = 0;
+        /// 连接已建立。
+        CONNECTED = 1;
+        /// 监听器相关消息。
+        LISTENER = 2;
+    }
+
+    /// 内部消息类型，决定 `content` 如何解析。
+    Type type = 1;
+
+    /// 内部消息内容（二进制）。
+    bytes content = 2;
+}
+
+
+// MARK: - 内部消息的 content 具体结构
+
+/// 连接建立消息。
+/// 对应 `InternalMessage.type == CONNECTED` 时 `content` 的内容。
+message ConnectedMessage {
+    /// 用户 ID。
+    string userId = 1;
+    /// 连接 ID（服务端为本次连接分配的唯一标识）。
+    string connectId = 2;
+    /// 登录类型（区分不同端：iOS / Android / Web 等）。
+    uint32 loginType = 3;
+}
+
+
+/// 连接状态变化消息。
+/// 对应 `PubSubMessage.type == CONNECT_CHANGED` 时 `content` 的内容。
+message ConnectChangedMessage {
+    /// 用户 ID。
+    string userId = 1;
+    /// 是否已连接：true 已连上，false 已断开。
+    bool connected = 2;
+}
+
+
+/// 监听器消息。
+/// 对应 `InternalMessage.type == LISTENER` 时 `content` 的内容。
+///
+/// 用于向服务端**注册 / 注销**某类消息的监听。
+message ListenerMessage {
+
+    /// 监听器类型（监听哪一类通道）。
+    enum Type {
+        /// 未知类型（占位）。
+        UNKNOWN = 0;
+        /// 默认分发通道监听器。
+        DefaultDispatchChannelListener = 1;
+        /// 群组分发通道监听器。
+        GroupDispatchChannelListener = 2;
+        /// 多端在线分发通道监听器。
+        MultiOtherOnlineDispatchChannelListener = 3;
+    }
+
+    /// 监听器操作类型（添加 / 移除）。
+    enum OpType {
+        /// 未知操作（占位）。
+        OP_UNKNOWN = 0;
+        /// 添加监听。
+        AddListener = 1;
+        /// 移除监听。
+        RemoveListener = 2;
+    }
+
+    /// 监听器类型。
+    Type type = 1;
+
+    /// 操作类型：添加还是移除。
+    OpType opType = 2;
+
+    /// 用户 ID。
+    string userId = 3;
+
+    /// 项目 ID（多项目隔离时使用）。
+    string projectId = 4;
+
+    /// 附加内容。
+    string content = 5;
+
+    /// 消息发布时间戳（毫秒）。
+    uint64 msgPublishAt = 6;
+}

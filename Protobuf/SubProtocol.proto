@@ -1,0 +1,222 @@
+syntax = "proto3";
+
+import "google/protobuf/wrappers.proto";
+
+package app.meeky;
+
+// Java 生成配置
+option java_package = "com.atlas.im.model.protobuf";
+option java_outer_classname = "SubProtocol";
+// Swift 生成配置：类型会带 "IM" 前缀
+option swift_prefix = "IM";
+
+
+// MARK: - WebSocket 传输层
+
+/// WebSocket 请求消息。
+///
+/// 语义类似 HTTP 请求：`verb` + `path` + `body` + `headers`。
+message WebSocketRequestMessage {
+    /// 请求方法（如 "GET" / "POST" / 自定义动词）。
+    string verb = 1;
+    /// 请求路径。
+    string path = 2;
+    /// 请求体（用 BytesValue 包装，以便区分"无 body"和"空 body"）。
+    google.protobuf.BytesValue body = 3;
+    /// 请求 ID，用于把响应和请求配对。
+    /// jstype = JS_STRING：JS 里 int64 精度不够，序列化成字符串避免精度丢失。
+    uint64 id = 4 [jstype = JS_STRING];
+    /// 请求头（注意：这里是 repeated string，不是 map）。
+    repeated string headers = 5;
+}
+
+/// WebSocket 响应消息。
+message WebSocketResponseMessage {
+    /// 对应的请求 ID。
+    uint64 id = 1 [jstype = JS_STRING];
+    /// 状态码（0 表示成功，非 0 表示业务错误）。
+    uint32 status = 2;
+    /// 状态描述信息。
+    string message = 3;
+    /// 响应体。
+    google.protobuf.BytesValue body = 4;
+    /// 响应头。
+    repeated string headers = 5;
+}
+
+/// WebSocket 消息的统一封装（请求或响应）。
+message WebSocketMessage {
+    enum Type {
+        /// 未知类型（占位）。
+        UNKNOWN = 0;
+        /// 请求。
+        REQUEST = 1;
+        /// 响应。
+        RESPONSE = 2;
+    }
+
+    /// 消息类型。
+    Type type = 1;
+    /// 请求消息（`type == REQUEST` 时有效）。
+    WebSocketRequestMessage request = 2;
+    /// 响应消息（`type == RESPONSE` 时有效）。
+    WebSocketResponseMessage response = 3;
+}
+
+
+// MARK: - 业务信封层
+
+/// 业务消息的统一信封。
+///
+/// `type` 决定 `content` 里是哪种具体消息（用 `oneof` 保证只有一个有值）。
+message Envelope {
+
+    enum Type {
+        /// 未知类型（占位）。
+        UNKNOWN = 0;
+        /// 私聊会话消息。
+        PRIVATE_CONVERSATION = 1;
+        /// 群聊会话消息。
+        GROUP_CONVERSATION = 2;
+        /// 数据消息。
+        DATA = 3;
+        /// 指令消息。
+        COMMAND = 4;
+        /// 复合消息（一次携带多条）。
+        COMPLEX = 5;
+        /// 即时群组消息。
+        INSTANT_GROUP = 6;
+    }
+
+    /// 信封类型，决定 `content` 是哪种消息。
+    Type type = 1;
+
+    /// 消息时间戳（毫秒）。
+    uint64 timestamp = 2 [jstype = JS_STRING];
+
+    /// 消息内容，用 oneof 保证同时只有一种。
+    oneof content {
+        /// 会话消息。
+        ConversationMessage conversationMessage = 3;
+        /// 数据消息。
+        DataMessage dataMessage = 4;
+        /// 指令消息。
+        CommandMessage commandMessage = 5;
+        /// 复合消息。
+        ComplexMessage complexMessage = 6;
+        /// 即时群组消息。
+        InstantGroupMessage instantGroupMessage = 7;
+    }
+
+    /// 信封 ID。
+    string id = 8;
+}
+
+
+// MARK: - 具体业务消息
+
+/// 会话消息（一条聊天消息）。
+message ConversationMessage {
+    /// 消息 ID。
+    string id = 1;
+    /// 所属会话 ID。
+    string conversationId = 2;
+    /// 消息类型（文本、图片等，具体取值见业务定义）。
+    uint32 type = 3;
+    /// 发送者 ID。
+    string senderId = 4;
+    /// 消息内容。
+    string content = 5;
+    /// 扩展字段（通常为 JSON）。
+    string extras = 6;
+    /// 创建时间戳（毫秒）。
+    uint64 createdAt = 7 [jstype = JS_STRING];
+    /// 更新时间戳（毫秒）。
+    uint64 updatedAt = 8 [jstype = JS_STRING];
+    /// 消息数量。
+    uint64 messageCount = 9;
+    /// 是否更新会话的最新消息。
+    bool updateLatestMessage = 10;
+    /// 发送者已读数。
+    uint64 senderReadCount = 11;
+    /// 被 @ 的用户 ID 列表。
+    repeated string atIds = 12;
+}
+
+/// 数据消息（简单透传内容）。
+message DataMessage {
+    /// 内容。
+    string content = 1;
+}
+
+/// 指令消息（系统级操作）。
+message CommandMessage {
+
+    enum Type {
+        /// 未知（占位）。
+        UNKNOWN = 0;
+        /// 会话创建。
+        CONVERSATION_CREATION = 1;
+        /// 项目自定义。
+        PROJECT_CUSTOMIZED = 2;
+        /// 私聊消息回执。
+        PRIVATE_MESSAGE_ACK = 3;
+        /// 用户在线状态变化。
+        USER_ONLINE_CHANGED = 4;
+        /// 会话正在输入。
+        CONVERSATION_TYPING = 5;
+        /// 通用消息。
+        COMMON_MESSAGE = 6;
+        /// socket 已连接。
+        SOCKET_CONNECTED = 7;
+    }
+
+    /// 指令类型。
+    Type type = 1;
+    /// 指令内容。
+    string content = 2;
+}
+
+/// 复合消息：一次携带多条不同类型的消息。
+message ComplexMessage {
+    /// 多条会话消息。
+    repeated ConversationMessage conversationMessage = 1;
+    /// 多条即时群组消息。
+    repeated InstantGroupMessage instantGroupMessage = 2;
+    /// 多条指令消息。
+    repeated CommandMessage commandMessage = 3;
+}
+
+/// 即时群组消息。
+message InstantGroupMessage {
+
+    enum Type {
+        /// 未知（占位）。
+        UNKNOWN = 0;
+        /// 项目自定义。
+        PROJECT_CUSTOMIZED = 1;
+        /// 加入群组。
+        GROUP_JOINED = 2;
+        /// 退出群组。
+        GROUP_QUIT = 3; // 正常退出
+        /// 被强制移出。
+        FORCE_QUIT = 4;
+        /// 项目竞赛。
+        ITEM_COMPETITION = 5;
+        /// 项目发布。
+        ITEMS_RELEASE = 6;
+    }
+
+    /// 类型。
+    Type type = 1;
+    /// 群组名称。
+    string groupName = 2;
+    /// 发送者 ID。
+    string senderId = 3;
+    /// 内容。
+    string content = 4;
+    /// 发送者的 IM 用户 ID。
+    string senderImUserId = 5;
+    /// 扩展字段。
+    string extras = 6;
+}

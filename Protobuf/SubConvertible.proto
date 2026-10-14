@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package app.ios;
+// Swift 生成配置：生成的类型会带 "IM" 前缀
+option swift_prefix = "IM";
+
+
+/// 拉取消息列表的响应。
+///
+/// 用于分页获取某个会话（或一批会话）的消息。
+message V1MessagesGetRes {
+
+    /// 消息数据列表。
+    repeated V1MessagesGetData data = 1;
+
+    /// 本次返回的消息条数。
+    int32 count = 2;
+
+    /// 下一页的分页令牌（游标）。传给下一次请求以获取下一页。
+    string nextPageToken = 3;
+
+    /// 是否还有下一页。
+    /// true：可以继续用 `nextPageToken` 拉取；false：已到末尾。
+    bool hasNext = 4;
+}
+
+
+/// 单条消息的数据结构。
+message V1MessagesGetData {
+
+    /// 消息 ID（全局唯一）。
+    string id = 1;
+
+    /// 所属会话 ID。
+    string conversationId = 2;
+
+    /// 消息类型。
+    /// 取值：
+    /// - 0: UnknownMessage（未知）
+    /// - 1: TextMessage（文本）
+    /// - 3: SystemMessage（系统消息）
+    /// - 4: InternalMessage（内部消息）
+    /// - 5: BurnableMessage（阅后即焚）
+    /// - 6: InstructionMessage（指令消息）
+    /// 注意：未使用值 2。
+    uint32 type = 3;
+
+    /// 发送者用户 ID。
+    string senderUid = 4;
+
+    /// 消息内容（格式随 `type` 变化，可能是 JSON / 明文 / 密文等）。
+    string content = 5;
+
+    /// 扩展字段（附加信息，通常是 JSON 字符串）。
+    string extras = 6;
+
+    /// 创建时间戳（毫秒）。
+    int64 createdAt = 7;
+
+    /// 更新时间戳（毫秒）。消息被编辑 / 撤回等操作后会更新。
+    int64 updatedAt = 8;
+
+    /// 已读该消息的用户 ID 列表。
+    repeated string readUsers = 9;
+
+    /// 是否为阅后即焚消息。
+    bool burn = 10;
+
+    /// 是否已被撤回。
+    bool revoked = 11;
+
+    /// 被 @ 的用户 ID 列表。
+    repeated string atIds = 12;
+}
